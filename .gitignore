@@ -1,0 +1,77 @@
+# Ignore class files
+*.class
+#Intelij
+*.iml
+#Doks
+*.pdf
+*.png
+*.jpeg
+# Package Files #
+*.jar
+*.war
+*.ear
+
+# Eclipse project data
+.classpath
+.project
+
+# Maven specific files
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+
+# Gradle specific files
+.gradle
+/build
+/app/build
+
+# IDEA files
+.idea
+source.iml
+/.idea/workspace.xml
+/.idea/libraries
+.DS_Store
+
+# Eclipse (general files)
+.metadata
+bin/
+tmp/
+*.bak
+local.properties
+.settings/
+.loadpath
+*.tmp
+
+#From geotrelles-template
+project/boot
+project/plugins/project
+project/plugins/target
+project/target
+target
+.ensime
+\#*#
+*~
+.#*
+.lib
+*.aux.xml
+*.jar
+*.crc
+_SUCCESS
+
+*.pyc
+.project
+.classpath
+.cache
+.settings
+.history
+.idea
+.DS_Store
+*.iml
+*.swp
+*.swo
+*.sublime-*
+.vagrant
+
