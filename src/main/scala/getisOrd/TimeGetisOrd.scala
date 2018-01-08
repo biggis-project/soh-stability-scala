@@ -5,7 +5,7 @@ import datastructure.{MeasuersFocal, MeasuersGloabl}
 import geotrellis.TimeNeighbourhood
 import geotrellis.raster.mapalgebra.focal.Kernel
 import geotrellis.raster.stitch.Stitcher.MultibandTileStitcher
-import geotrellis.raster.{DoubleRawArrayTile, MultibandTile, Raster, Tile}
+import geotrellis.raster.{DoubleRawArrayTile, GridBounds, MultibandTile, Raster, Tile}
 import geotrellis.spark.{Metadata, SpatialKey, TileLayerMetadata}
 import importExport.{ImportGeoTiff, PathFormatter, ResultType, StringWriter}
 import org.apache.spark.rdd.RDD
@@ -39,13 +39,34 @@ object TimeGetisOrd {
 
     val r = rdd.withContext { x => x.
       bufferTiles(focalKernel.extent)
-      .mapValues{ mbT => mbT.tile}
+      //.mapValues{ mbT => mbT.tile}
+      .mapValues{ mbT => crop(mbT.tile, mbT.targetArea)}
       }
 
 
     val raster = r.stitch()
     //WriteTimeMeasurring(setting, origin, start, raster)
     raster
+  }
+
+  def crop(mbT: MultibandTile, gridBounds: GridBounds) = {
+    val bands = mbT.bandCount
+    val size = gridBounds.height
+    println("Size:"+size)
+    println("ColMin,RowMin"+gridBounds.colMin+","+gridBounds.rowMin)
+    println("ColMax,RowMax"+mbT.cols+","+mbT.rows)
+    var bandArray = new Array[DoubleRawArrayTile](bands)
+    for (b <- 0 to bands-1) {
+      bandArray(b) = new DoubleRawArrayTile(Array.fill(size*size)(0), size, size)
+      for(r <- 0 to size-1){
+        for(c <- 0 to size-1){
+          bandArray(b).setDouble(c,r, mbT.band(b).getDouble(c+gridBounds.colMin,r+gridBounds.rowMin))
+        }
+      }
+    }
+
+    val multibandTile = MultibandTile.apply(bandArray)
+    multibandTile
   }
 
   var timeMeasuresFocal = new MeasuersFocal()
