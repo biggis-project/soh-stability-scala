@@ -6,7 +6,7 @@ import geotrellis.TimeNeighbourhood
 import geotrellis.raster.mapalgebra.focal.Kernel
 import geotrellis.raster.stitch.Stitcher.MultibandTileStitcher
 import geotrellis.raster.{DoubleRawArrayTile, GridBounds, MultibandTile, Raster, Tile}
-import geotrellis.spark.{Metadata, SpatialKey, TileLayerMetadata}
+import geotrellis.spark.{ContextRDD, Metadata, SpatialKey, TileLayerMetadata}
 import importExport.{ImportGeoTiff, PathFormatter, ResultType, StringWriter}
 import org.apache.spark.rdd.RDD
 import parmeters.Settings
@@ -31,21 +31,24 @@ object TimeGetisOrd {
     val focalKernel = Kernel.circle(2*setting.focalRange+1, setting.focalRange,setting.focalRange)
 
     var st : StatsGlobal= null
+    var r : ContextRDD[SpatialKey, MultibandTile, TileLayerMetadata[SpatialKey]] = null
     if(!setting.focal){
       val startStats = System.currentTimeMillis()
-      st = getSTGlobal(origin)
+      st = getSTGlobal(origin, setting)
       timeMeasuresGlobal.setStats(System.currentTimeMillis()-startStats)
-    }
-
-    val r = rdd.withContext { x => x.
-      bufferTiles(focalKernel.extent)
-      //.mapValues{ mbT => mbT.tile}
-      .mapValues{ mbT => crop(mbT.tile, mbT.targetArea)}
+      r = rdd.withContext { x => x.
+        bufferTiles(focalKernel.extent)
+        //.mapValues{ mbT => mbT.tile}
+        .mapValues{ mbT => crop(getMultibandGetisOrd(mbT.tile,setting,st), mbT.targetArea)}
       }
-
-
+    } else {
+      r = rdd.withContext { x => x.
+        bufferTiles(focalKernel.extent)
+        //.mapValues{ mbT => mbT.tile}
+        .mapValues{ mbT => crop(getMultibandFocalGetisOrd(mbT.tile, setting), mbT.targetArea)}
+      }
+    }
     val raster = r.stitch()
-    //WriteTimeMeasurring(setting, origin, start, raster)
     raster
   }
 
@@ -116,33 +119,10 @@ object TimeGetisOrd {
 
     var start = System.currentTimeMillis()
     val RoW = getSum(multibandTile, weightNeighbour)
-    timeMeasuresGlobal.setRoW(System.currentTimeMillis()-start)
-
-    println("End RoW")
-
     start = System.currentTimeMillis()
-    val MW = stats.gM*weightNeighbour.getSum() //W entry is allways 1
-    timeMeasuresGlobal.setMW(System.currentTimeMillis()-start)
 
-    start = System.currentTimeMillis()
-    val NW2 = stats.gN.toLong*weightNeighbour.getSum().toLong //W entry is allways 1
-    timeMeasuresGlobal.setNW2(System.currentTimeMillis()-start)
-
-    start = System.currentTimeMillis()
-    val W2 = Math.pow(weightNeighbour.getSum(),2)
-    timeMeasuresGlobal.setW2(System.currentTimeMillis()-start)
-
-    start = System.currentTimeMillis()
-    val denominator = stats.gS*Math.sqrt((NW2-W2)/(stats.gN-1))
-    timeMeasuresGlobal.setDenominator(System.currentTimeMillis()-start)
-
-    assert(denominator>0)
-
-    println("End Denminator")
-
-    start = System.currentTimeMillis()
     val res = RoW.mapBands((band:Int,tile:Tile)=>tile.mapDouble(x=>{
-      var result =((x-MW)/denominator)
+      var result =((x-stats.MW)/stats.denominator)
       if(!isNotNaN(result)){
         result = 0
       }
@@ -161,18 +141,13 @@ object TimeGetisOrd {
       for (y <- -radius to radius) {
         for(z <- -radiusTime to radiusTime){
           if (spheroid.isInRange(x,y,z)) {
-            var cx = c + x
-            var ry = r + y
             var bz = (b + z) % 24
             if (bz < 0) {
               bz += 24
             }
-            if (MultibandUtils.isInTile(c + x, r + y, mbT)) {
-              sd += Math.pow(mbT.band(bz).getDouble(cx, ry)-mean,2)
-              n += 1
-            } else {
-              //throw new IllegalAccessError("Geotrellis not working as expectet")
-            }
+            sd += Math.pow(mbT.band(bz).getDouble(c, r)-mean,2)
+            n += 1
+
           }
         }
       }
@@ -191,18 +166,13 @@ object TimeGetisOrd {
       for (y <- -radius to radius) {
         for (z <- -radiusTime to radiusTime) {
           if (spheroid.isInRange(x, y, z)) {
-            var cx = c + x
-            var ry = r + y
             var bz = (b + z) % 24
             if (bz < 0) {
               bz += 24
             }
-            if (MultibandUtils.isInTile(c + x, r + y, mbT)) {
-              row += mbT.band(bz).getDouble(cx, ry)
-              wSum += 1
-            } else {
-              //throw new IllegalAccessError("Geotrellis not working as expectet")
-            }
+            row += mbT.band(bz).getDouble(c, r)
+            wSum += 1
+
           }
         }
       }
@@ -230,18 +200,13 @@ object TimeGetisOrd {
       for (y <- -radius to radius) {
         for(z <- -radiusTime to radiusTime){
           if (weightNeighbour.isInRange(x,y,z)) {
-            var cx = c + x
-            var ry = r + y
             var bz = (b + z) % 24
             if (bz < 0) {
               bz += 24
             }
-            if (MultibandUtils.isInTile(c + x, r + y, mbT)) {
-              sum += mbT.band(bz).getDouble(cx, ry)
-              count += 1
-            } else {
-              //throw new IllegalAccessError("Geotrellis not working as expectet")
-            }
+            sum += mbT.band(bz).getDouble(c, r)
+            count += 1
+
           }
         }
       }
@@ -257,17 +222,11 @@ object TimeGetisOrd {
       for (y <- -radius to radius) {
         for(z <- -radiusTime to radiusTime){
         if (weightNeighbour.isInRange(x,y,z)) {
-          var cx = c + x
-          var ry = r + y
           var bz = (b + z) % 24
           if (bz < 0) {
             bz += 24
           }
-          if (MultibandUtils.isInTile(c + x, r + y, mbT)) {
-            sum += mbT.band(bz).getDouble(cx, ry)
-          } else {
-            //throw new IllegalAccessError("Geotrellis not working as expectet")
-          }
+          sum += mbT.band(bz).getDouble(c, r)
         }
         }
       }
@@ -321,12 +280,17 @@ object TimeGetisOrd {
       "----------------------------------------------------------------------------------------------------------")
   }
 
-  private def getSTGlobal(origin : MultibandTile): StatsGlobal = {
+  private def getSTGlobal(origin : MultibandTile, setting : Settings): StatsGlobal = {
+    val weightNeighbour = MultibandUtils.getWeight(setting,setting.weightRadius, setting.weightRadiusTime)
     val gN = (origin.bandCount * origin.rows * origin.cols)
     val gM = origin.bands.map(x => x.toArrayDouble().filter(x => isNotNaN(x)).reduce(_ + _)).reduce(_ + _)/gN
     val singelSDBand = origin.bands.map(x => x.toArrayDouble().filter(x => isNotNaN(x)).map(x => Math.pow(x - gM, 2)).reduce(_ + _))
     val gS = Math.sqrt((singelSDBand.reduce(_ + _)) * (1.0 / (gN.toDouble - 1.0)))
-    new StatsGlobal(gN,gM,gS)
+    val MW = gM*weightNeighbour.getSum() //W entry is allways 1
+    val NW2 =gN.toLong*weightNeighbour.getSum().toLong //W entry is allways 1
+    val W2 = Math.pow(weightNeighbour.getSum(),2)
+    val denominator = gS*Math.sqrt((NW2-W2)/(gN-1))
+    new StatsGlobal(gN, gM, gS, MW,denominator)
   }
 
   private def isInRange(newKey: SpatialKey, max : SpatialKey): Boolean = {
@@ -374,7 +338,7 @@ object TimeGetisOrd {
 
   }
 
-  private class StatsGlobal(val gN : Int, val gM : Double, val gS :Double) extends Serializable{
+  private class StatsGlobal(val gN : Int, val gM : Double, val gS :Double, val denominator : Double, val MW : Double) extends Serializable{
     override def toString: String = "stats(N,M,S):("+gN+","+gM+","+gS+")"
   }
 

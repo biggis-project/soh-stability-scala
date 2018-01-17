@@ -104,34 +104,35 @@ object MetrikValidation {
     val timeDimensionStep = 2
     val aggregationSteps = 2 //400, 800
     val zoom = 3
-    val experiments = new Array[Settings](monthToTest * weightToTest * focalRangeToTest * timeDimensionStep * timeDimensionStep * aggregationSteps +
-                                          monthToTest * weightToTest * focalRangeToTest * timeDimensionStep * timeDimensionStep * zoom)
+    val experiments = new Array[Settings](1)
+//      [Settings](monthToTest * weightToTest * focalRangeToTest * timeDimensionStep * timeDimensionStep * aggregationSteps +
+//                                          monthToTest * weightToTest * focalRangeToTest * timeDimensionStep * timeDimensionStep * zoom)
 
     var counter = 0
 
+    experiments(counter) = getBasicSettings(5 + weightStepSize, 1, 10 + focalRangeStepSize, 2, 3, 1, 1)
 
-
-    for (m <- 2 to monthToTest) {
-    var m = 1
-      for (w <- 0 to weightToTest - 1) {
-        for (f <- 0 to focalRangeToTest - 1) {
-          for (tf <- 0 to timeDimensionStep - 1) {
-            for (tw <- 0 to timeDimensionStep - 1) {
-              for (a <- 0 to aggregationSteps - 1)  {
-                  experiments(counter) = getBasicSettings(5 + w * weightStepSize, 1 + tw, 10 + f * focalRangeStepSize, 2 + tf, 3 + a, m, 1)
-                  val settings = experiments(counter)
-                    counter += 1
-              }
-              for (z <- 2 to zoom) {
-               experiments(counter) = getBasicSettings(5 + w * weightStepSize, 1 + tw, 10 + f * focalRangeStepSize, 2 + tf, 3, m, z)
-               val settings = experiments(counter)
-                counter += 1
-              }
-            }
-          }
-        }
-      }
-    }
+//    for (m <- 2 to monthToTest) {
+//    var m = 1
+//      for (w <- 0 to weightToTest - 1) {
+//        for (f <- 0 to focalRangeToTest - 1) {
+//          for (tf <- 0 to timeDimensionStep - 1) {
+//            for (tw <- 0 to timeDimensionStep - 1) {
+//              for (a <- 0 to aggregationSteps - 1)  {
+//                  experiments(counter) = getBasicSettings(5 + w * weightStepSize, 1 + tw, 10 + f * focalRangeStepSize, 2 + tf, 3 + a, m, 1)
+//                  val settings = experiments(counter)
+//                    counter += 1
+//              }
+//              for (z <- 2 to zoom) {
+//               experiments(counter) = getBasicSettings(5 + w * weightStepSize, 1 + tw, 10 + f * focalRangeStepSize, 2 + tf, 3, m, z)
+//               val settings = experiments(counter)
+//                counter += 1
+//              }
+//            }
+//          }
+//        }
+//      }
+//    }
 
     experiments
   }
@@ -232,12 +233,12 @@ class MetrikValidation {
     var gStar : MultibandTile = null
     var cluster : MultibandTile = null
     println("deb.001")
-    if (PathFormatter.exist(settings, TifType.GStar) ) {
-      gStar = importTer.getMulitGeoTiff(settings, TifType.GStar)
-    } else {
+//    if (PathFormatter.exist(settings, TifType.GStar) ) {
+//      gStar = importTer.getMulitGeoTiff(settings, TifType.GStar)
+//    } else {
       gStar = TimeGetisOrd.getGetisOrd(rdd, settings, origin)
       importTer.writeMultiGeoTiff(gStar, settings, TifType.GStar)
-    }
+//    }
     println("deb.002")
     if(PathFormatter.exist(settings, TifType.Cluster)){
       cluster = importTer.getMulitGeoTiff(settings, TifType.Cluster)
